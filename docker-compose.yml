@@ -1,0 +1,55 @@
+version: '3'
+
+services:
+  api:
+    container_name: api
+    build:
+      context: .
+    volumes:
+      - ./app/api:/app/api
+    ports:
+      - 5000:80
+    command: uvicorn api.app:app --host 0.0.0.0 --port 80 --reload
+    env_file:
+      - .env
+
+  mongo:
+    image: mongo
+    command: mongod --dbpath /data/db --port 27018
+    ports:
+      - "27018:27018"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./docker/mongo_data:/docker-entrypoint-initdb.d
+
+
+  rabbitmq:
+    container_name: rabbitmqServer
+    image: "rabbitmq:3.6-management-alpine"
+    hostname: "rabbitmq-host"
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: "admin"
+      RABBITMQ_DEFAULT_PASS: "pass"
+
+  producer:
+    build:
+      context: ./app/notifications
+      dockerfile: Dockerfile
+    container_name: producer
+    depends_on:
+      - rabbitmq
+    ports:
+      - 7000:7000
+    environment:
+      RABBITMQ_USERNAME: "admin"
+      RABBITMQ_PASSSWORD: "pass"
+      RABBITMQ_HOST: rabbitmqServer
+      RABBITMQ_QUEUE: dataqueue
+      RABBITMQ_ROUTING_KEY: dataqueue
+      RABBITMQ_EXCHANGE: exchange_test
+      SERVER_PORT: 7000
+      SERVER_HOST: receiver
+    restart: always
